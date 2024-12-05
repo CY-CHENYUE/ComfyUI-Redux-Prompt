@@ -29,7 +29,7 @@ A ComfyUI custom node that provides fine-grained control over style transfer usi
 
    ```bash
    cd ComfyUI/custom_nodes
-   git clone [repository-url] redux_prompt_styler
+   git clone https://github.com/CY-CHENYUE/ComfyUI-Redux-Prompt.git
    ```
 
 2. Restart ComfyUI
