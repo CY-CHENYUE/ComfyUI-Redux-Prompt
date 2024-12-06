@@ -97,7 +97,7 @@ class ReduxPromptStyler:
 - conditioning: 原始提示词输入
 - style_model: Redux 风格模型
 - clip_vision: CLIP 视觉编码器
-- reference_image: 风格来源图像
+- reference_image: ��格来源图像
 - prompt_influence: 提示词强度 (1.0=正常)
 - reference_influence: 图像影响 (1.0=正常)
 - style_grid_size: 风格细节等级 (1=最强 27x27, 14=最弱 1x1)
@@ -230,7 +230,7 @@ class ReduxPromptStyler:
                               interpolation_mode, image_processing_mode,
                               mask=None, autocrop_padding=32):
         """
-        将参考图像的风格应用到提示词条件中
+        将参考图像的风格��用到提示词条件中
         
         Args:
             clip_vision: CLIP视觉编码器
@@ -264,7 +264,7 @@ class ReduxPromptStyler:
         processed_image = self.prepare_image(
             reference_image,
             mask=mask,  # 传入蒙版参数
-            mode=image_processing_mode,  # 使用函数参数中的图像处理模式
+            mode=image_processing_mode,  # 使���函数参数中的图像处理模式
             padding=autocrop_padding,  # 使用函数参数中的自动裁剪边距
             desired_size=384  # 可以根据需要修改目尺寸
         )
@@ -286,21 +286,27 @@ class ReduxPromptStyler:
         # 应用下采样来减少 tokens 数量
         b, t, h = cond.shape
         m = int(np.sqrt(t))
-        cond = cond.view(b, m, m, h)
         
-        if target_size < m:  # 只在需要降采样时处理
+        # style_grid_size = 1 时保持原始 27x27 网格
+        if style_grid_size == 1:
+            # 直接使用原始的 cond，不需要任何插值
+            pass
+        else:
+            cond = cond.view(b, m, m, h)
+            cond = cond.permute(0, 3, 1, 2)  # [B, C, H, W]
             cond = torch.nn.functional.interpolate(
-                cond.transpose(1, -1),
+                cond,
                 size=(target_size, target_size),
                 mode=interpolation_mode,
                 align_corners=True if interpolation_mode in ["bicubic", "bilinear"] else None
             )
-            cond = cond.transpose(1, -1).reshape(b, -1, h)
+            cond = cond.permute(0, 2, 3, 1)  # [B, H, W, C]
+            cond = cond.reshape(b, target_size * target_size, h)
         
         # 应用风格权重
         cond = cond * (reference_influence * reference_influence)
         
-        # 合���条件
+        # 合条件
         c = []
         for t in conditioning:
             # 先应用提示词权重
