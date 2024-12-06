@@ -4,6 +4,9 @@ A ComfyUI custom node that provides fine-grained control over style transfer usi
 
 一个 ComfyUI 自定义节点，提供使用 Redux 风格模型进行精细风格迁移控制。
 
+![2](https://github.com/user-attachments/assets/1f961070-185a-41ed-ac31-c3cfa6684e94)
+
+
 ## Features / 功能特点
 
 - Combine text prompts with reference image styles
