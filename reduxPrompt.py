@@ -34,17 +34,18 @@ class ReduxPromptStyler:
                     "step": 0.1
                 }),
                 
-                # 控制风格tokens的数量 (越大=风格影响越弱，提示词影响越强)
-                # 3 = 平衡值 (27x27 → 9x9)
-                # 1 = 最强风格影响 (保持 27x27)
-                # 9 = 最弱风格影响 (27x27 → 3x3)
-                "style_token_reduction": (["strong style", "balanced", "weak style", "auto balance"], {
-                    "default": "balanced",
+                # 控制风格tokens的网格大小
+                "style_grid_size": ("INT", {
+                    "default": 9,            # 默认值改为9 (对应5x5网格)
+                    "min": 1,                # 第1个选项
+                    "max": 14,               # 第14个选项
+                    "step": 1,               # 每次调整1步
+                    "display": "slider",     # 显示为滑块
                 }),
                 
-                # 风格token缩减时使用的插值方法
-                "reduction_interpolation": (["area", "bicubic", "nearest"], {
-                    "default": "nearest"
+                # 插值方法择
+                "interpolation_mode": (["bicubic", "bilinear", "nearest", "area"], {
+                    "default": "bicubic",
                 }),
                 
                 # 参考图像的处理模式
@@ -86,8 +87,8 @@ class ReduxPromptStyler:
 - reference_image: Style source image
 - prompt_influence: Prompt strength (1.0=normal)
 - reference_influence: Image influence (1.0=normal)
-- style_token_reduction: Style strength (strong/balanced/weak/auto)
-- reduction_interpolation: Interpolation method
+- style_grid_size: Style detail level (1=strongest 27x27, 14=weakest 1x1)
+- interpolation_mode: Token interpolation method
 - image_processing_mode: Image mode (crop/aspect/mask)
 - mask: Optional mask
 - autocrop_padding: Cropping padding (0-256)
@@ -99,8 +100,8 @@ class ReduxPromptStyler:
 - reference_image: 风格来源图像
 - prompt_influence: 提示词强度 (1.0=正常)
 - reference_influence: 图像影响 (1.0=正常)
-- style_token_reduction: 风格强度 (强/平衡/弱/自动)
-- reduction_interpolation: 插值方法
+- style_grid_size: 风格细节等级 (1=最强 27x27, 14=最弱 1x1)
+- interpolation_mode: Token插值方法
 - image_processing_mode: 图像模式 (裁剪/比例/蒙版)
 - mask: 可选蒙版
 - autocrop_padding: 裁剪边距 (0-256)"""
@@ -225,8 +226,8 @@ class ReduxPromptStyler:
 
 
     def apply_style_with_prompt(self, clip_vision, reference_image, style_model, conditioning, 
-                              prompt_influence, reference_influence, style_token_reduction,
-                              reduction_interpolation, image_processing_mode,
+                              prompt_influence, reference_influence, style_grid_size,
+                              interpolation_mode, image_processing_mode,
                               mask=None, autocrop_padding=32):
         """
         将参考图像的风格应用到提示词条件中
@@ -238,23 +239,26 @@ class ReduxPromptStyler:
             conditioning: 原始提示词条件
             prompt_influence: 提示词影响强度
             reference_influence: 参考图影响强度
-            style_token_reduction: 风格token缩减因子
-            reduction_interpolation: token缩减插值方法
-            image_processing_mode: 图像处模式
+            style_grid_size: 风格token网格大小
+            interpolation_mode: token缩减插值法
+            image_processing_mode: 图像处理模式
             mask: 可选的蒙版
             autocrop_padding: 自动裁剪边距
         
         Returns:
-            tuple: (处理后的条件, 处理后图像)
+            tuple: (处理后的条, 处理后图像)
         """
         # 将文字选项转换为对应的数值
         reduction_map = {
-            "strong style": 1,
-            "balanced": 3,
-            "weak style": 9,
+            "strongest style (27x27)": 1,
+            "strong style (9x9)": 3,
+            "balanced style (5x5)": 5,
+            "weak style (3x3)": 9,
+            "weakest style (1x1)": 27,
             "auto balance": None  # 使用 None 表示自动平衡逻辑
         }
-        reduction_factor = reduction_map[style_token_reduction]
+        target_size = style_grid_size
+        reduction_factor = target_size
         
         # 预处理参考图像到指定大小和格式
         processed_image = self.prepare_image(
@@ -275,45 +279,28 @@ class ReduxPromptStyler:
         # 获取提示词的 tokens 数量
         prompt_tokens = conditioning[0][0].shape[1]  # 获取第一个条件的 token 数量
 
-        # 自动平衡模式
-        if reduction_factor is None:
-            # 计算原始风格tokens和提示词tokens的比例
-            original_tokens = 27 * 27  # 729 tokens
-            style_to_prompt_ratio = original_tokens / prompt_tokens
-            
-            # 基于比例动态计算缩减因子
-            if style_to_prompt_ratio <= 1.2:  # 风格tokens比提示词少或相近
-                reduction_factor = 1  # 27x27 = 729 tokens
-            elif style_to_prompt_ratio <= 3.0:  # 适中差距
-                reduction_factor = 3  # 9x9 = 81 tokens
-            elif style_to_prompt_ratio <= 6.0:  # 较大差距
-                reduction_factor = 9  # 3x3 = 9 tokens
-            else:  # 大差距
-                reduction_factor = 27  # 1x1 = 1 token
-            
-            # 确保最终的风格tokens数量不会太少
-            final_tokens = (27 // reduction_factor) ** 2
-            if final_tokens < 9:  # 保证最少9个风格tokens (3x3)
-                reduction_factor = 9
+        # 计算目标网格大小（从滑块值转换到实际的网格大小）
+        grid_sizes = [27, 25, 23, 21, 19, 17, 15, 13, 11, 9, 7, 5, 3, 1]
+        target_size = grid_sizes[style_grid_size - 1]  # 因为滑块值从1开始
         
         # 应用下采样来减少 tokens 数量
-        if reduction_factor > 1:
-            b, t, h = cond.shape
-            m = int(np.sqrt(t))
-            cond = cond.view(b, m, m, h)
-            
+        b, t, h = cond.shape
+        m = int(np.sqrt(t))
+        cond = cond.view(b, m, m, h)
+        
+        if target_size < m:  # 只在需要降采样时处理
             cond = torch.nn.functional.interpolate(
                 cond.transpose(1, -1),
-                size=(m // reduction_factor, m // reduction_factor),
-                mode=reduction_interpolation,
-                align_corners=True if reduction_interpolation == "bicubic" else None
+                size=(target_size, target_size),
+                mode=interpolation_mode,
+                align_corners=True if interpolation_mode in ["bicubic", "bilinear"] else None
             )
             cond = cond.transpose(1, -1).reshape(b, -1, h)
-
+        
         # 应用风格权重
         cond = cond * (reference_influence * reference_influence)
         
-        # 合并条件
+        # 合���条件
         c = []
         for t in conditioning:
             # 先应用提示词权重
