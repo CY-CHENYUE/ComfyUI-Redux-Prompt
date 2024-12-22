@@ -8,7 +8,7 @@ A ComfyUI custom node that provides fine-grained control over style transfer usi
 
 https://github.com/user-attachments/assets/d6cf3b71-0221-4804-a757-e43feab0850f
 
-
+![alt text](服饰一致性.png)
 
 ## Features / 功能特点
 

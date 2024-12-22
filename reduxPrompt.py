@@ -97,7 +97,7 @@ class ReduxPromptStyler:
 - conditioning: 原始提示词输入
 - style_model: Redux 风格模型
 - clip_vision: CLIP 视觉编码器
-- reference_image: ��格来源图像
+- reference_image: 风格参考图像
 - prompt_influence: 提示词强度 (1.0=正常)
 - reference_influence: 图像影响 (1.0=正常)
 - style_grid_size: 风格细节等级 (1=最强 27x27, 14=最弱 1x1)
