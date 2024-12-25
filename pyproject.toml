@@ -1,0 +1,15 @@
+[project]
+name = "comfyui-redux-prompt"
+description = "A ComfyUI custom node that provides fine-grained control over style transfer using Redux style models."
+version = "1.0.0"
+license = {file = "LICENSE"}
+dependencies = ["numpy", "torch"]
+
+[project.urls]
+Repository = "https://github.com/CY-CHENYUE/ComfyUI-Redux-Prompt"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI-Redux-Prompt"
+Icon = ""
