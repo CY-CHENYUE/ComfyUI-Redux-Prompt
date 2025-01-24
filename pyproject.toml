@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-redux-prompt"
 description = "A ComfyUI custom node that provides fine-grained control over style transfer using Redux style models."
-version = "1.0.1"
+version = "1.0.2"
 license = {file = "LICENSE"}
 dependencies = ["numpy", "torch"]
 
