@@ -10,6 +10,6 @@ Repository = "https://github.com/CY-CHENYUE/ComfyUI-Redux-Prompt"
 #  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
-PublisherId = ""
+PublisherId = "cychenyue"
 DisplayName = "ComfyUI-Redux-Prompt"
 Icon = ""
